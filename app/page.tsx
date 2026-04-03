@@ -1,102 +1,390 @@
+﻿import dynamic from "next/dynamic";
 import Image from "next/image";
+import Link from "next/link";
+import {
+  AlertTriangleIcon,
+  BrainCircuitIcon,
+  CalendarClockIcon,
+  CheckCircle2Icon,
+  CoinsIcon,
+  HeartHandshakeIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  UsersRoundIcon,
+  WalletCardsIcon,
+} from "lucide-react";
+
+import { HeroExperiment } from "@/components/hero-experiment";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  faqLinks,
+  featureCards,
+  painPoints,
+  pricingTiers,
+  siteConfig,
+  stats,
+  testimonials,
+} from "@/lib/site-content";
+
+const PainPointsCarousel = dynamic(() => import("@/components/pain-points-carousel"));
+const TestimonialsSlider = dynamic(() => import("@/components/testimonials-slider"));
+
+const featureIcons = [BrainCircuitIcon, UsersRoundIcon, WalletCardsIcon];
+
+function SectionIntro({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl text-center">
+      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-primary shadow-sm dark:bg-white/6">
+        <SparklesIcon className="size-3.5" />
+        {eyebrow}
+      </div>
+      <h2 className="section-title text-balance">{title}</h2>
+      <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+        {body}
+      </p>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="pb-16 sm:pb-24">
+      <header className="section-shell pt-4 sm:pt-6">
+        <div className="glass-panel flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 via-pink-500 to-amber-300 text-white shadow-lg shadow-rose-300/40">
+              <HeartHandshakeIcon className="size-5" />
+            </div>
+            <div>
+              <div className="font-heading text-2xl leading-none tracking-wide">
+                Wedding Shadow Book
+              </div>
+              <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                Vendor rescue platform
+              </div>
+            </div>
+          </Link>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+            <a href="#features" className="transition hover:text-foreground">
+              Features
+            </a>
+            <a href="#pricing" className="transition hover:text-foreground">
+              Pricing
+            </a>
+            <a href="#stories" className="transition hover:text-foreground">
+              Horror Stories
+            </a>
+            <a href="#testimonials" className="transition hover:text-foreground">
+              Testimonials
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Badge className="hidden rounded-full bg-primary/10 px-3 py-1 text-primary shadow-none sm:inline-flex">
+              Beta waitlist open
+            </Badge>
+            <ThemeToggle />
+          </div>
         </div>
+      </header>
+
+      <main className="space-y-18 sm:space-y-24">
+        <HeroExperiment
+          demoVideoUrl={siteConfig.demoVideoUrl}
+          stripeSignupUrl={siteConfig.stripeSignupUrl}
+        />
+
+        <section className="section-shell">
+          <div className="grid gap-4 md:grid-cols-4">
+            {stats.map((stat) => (
+              <Card
+                key={stat.label}
+                className="border-white/40 bg-white/70 shadow-[0_20px_70px_-45px_rgba(112,50,64,0.45)] dark:border-white/10 dark:bg-white/7"
+              >
+                <CardContent className="flex items-center justify-between gap-4 p-5">
+                  <div>
+                    <p className="text-3xl font-semibold tracking-tight text-foreground">
+                      {stat.value}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {stat.label}
+                    </p>
+                  </div>
+                  <CheckCircle2Icon className="size-5 text-primary" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section id="stories" className="section-shell">
+          <SectionIntro
+            eyebrow="Pain Points Carousel"
+            title="Every planner has a vendor ghost story"
+            body="Wedding Shadow Book turns those 11pm panic texts into a single workflow: detect risk, match backups, and lock in a replacement before the aisle walk starts slipping."
+          />
+          <div className="mt-10">
+            <PainPointsCarousel items={painPoints} />
+          </div>
+        </section>
+
+        <section id="features" className="section-shell">
+          <SectionIntro
+            eyebrow="Feature Grid"
+            title="AI backup coverage built for chaotic wedding weeks"
+            body="The platform scores vendor reliability, surfaces shadow options instantly, and wraps replacements in escrow-safe approvals so your team never swaps one risk for another."
+          />
+
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {featureCards.map((feature, index) => {
+              const Icon = featureIcons[index];
+
+              return (
+                <Card
+                  key={feature.title}
+                  className="relative overflow-hidden border-white/45 bg-white/72 shadow-[0_30px_80px_-50px_rgba(120,58,75,0.45)] dark:border-white/10 dark:bg-white/6"
+                >
+                  <CardContent className="p-6 sm:p-7">
+                    <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-amber-300 text-primary-foreground shadow-lg shadow-primary/25">
+                      <Icon className="size-5" />
+                    </div>
+                    <div className="mt-5 flex items-center justify-between gap-3">
+                      <h3 className="font-heading text-3xl leading-none">
+                        {feature.title}
+                      </h3>
+                      <Badge
+                        variant="secondary"
+                        className="rounded-full border border-white/50 bg-white/80 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-foreground dark:border-white/10 dark:bg-white/10"
+                      >
+                        {feature.highlight}
+                      </Badge>
+                    </div>
+                    <p className="mt-4 text-base leading-7 text-muted-foreground">
+                      {feature.description}
+                    </p>
+                    <div className="mt-6 rounded-3xl border border-primary/10 bg-primary/6 p-4 dark:bg-white/6">
+                      <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                        Why it matters
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-foreground/85">
+                        {feature.detail}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">
+            <Card className="overflow-hidden border-white/45 bg-white/72 dark:border-white/10 dark:bg-white/6">
+              <CardContent className="p-0">
+                <div className="border-b border-border/60 px-6 py-5">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+                    <CalendarClockIcon className="size-4" />
+                    Rescue dashboard
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    A live command center with risk scoring, backup response ETAs, and payment status.
+                  </p>
+                </div>
+                <Image
+                  src="/dashboard-preview.svg"
+                  alt="Dashboard preview showing AI risk scoring and backup vendor status"
+                  width={1600}
+                  height={1200}
+                  className="h-auto w-full"
+                  loading="lazy"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden border-white/45 bg-white/72 dark:border-white/10 dark:bg-white/6">
+              <CardContent className="p-0">
+                <div className="border-b border-border/60 px-6 py-5">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+                    <ShieldCheckIcon className="size-4" />
+                    Mobile vendor matching
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Backup confirmations and escrow release approvals stay fast on phones during event day chaos.
+                  </p>
+                </div>
+                <Image
+                  src="/mobile-match.svg"
+                  alt="Mobile UI preview for instant wedding vendor matching"
+                  width={1200}
+                  height={1200}
+                  className="h-auto w-full"
+                  loading="lazy"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section id="pricing" className="section-shell">
+          <SectionIntro
+            eyebrow="Pricing"
+            title="Start free, then scale your backup bench"
+            body="Keep the entry point frictionless for solo planners, then unlock more automations and concierge coverage as your event volume grows."
+          />
+          <div className="mt-10 grid gap-5 xl:grid-cols-3">
+            {pricingTiers.map((tier) => (
+              <Card
+                key={tier.name}
+                className={`relative overflow-hidden border-white/45 bg-white/75 dark:border-white/10 dark:bg-white/6 ${
+                  tier.featured
+                    ? "shadow-[0_36px_100px_-45px_rgba(170,113,44,0.65)] ring-1 ring-amber-300/60"
+                    : "shadow-[0_30px_90px_-50px_rgba(112,50,64,0.4)]"
+                }`}
+              >
+                <CardContent className="p-6 sm:p-7">
+                  {tier.featured ? (
+                    <Badge className="rounded-full bg-amber-400/90 px-3 py-1 text-amber-950 shadow-none">
+                      Most popular
+                    </Badge>
+                  ) : null}
+                  <div className="mt-4 flex items-end justify-between gap-4">
+                    <div>
+                      <h3 className="font-heading text-3xl leading-none">{tier.name}</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">{tier.tagline}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-4xl font-semibold tracking-tight">{tier.price}</p>
+                      <p className="text-sm text-muted-foreground">{tier.billing}</p>
+                    </div>
+                  </div>
+                  <ul className="mt-6 space-y-3 text-sm text-foreground/85">
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3">
+                        <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    asChild
+                    className={`mt-7 h-11 w-full rounded-full text-sm ${
+                      tier.featured
+                        ? "bg-gradient-to-r from-primary via-rose-500 to-amber-400 text-white shadow-lg shadow-primary/30 hover:opacity-95"
+                        : ""
+                    }`}
+                    variant={tier.featured ? "default" : "outline"}
+                  >
+                    <a href={siteConfig.stripeSignupUrl}>{tier.cta}</a>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section id="testimonials" className="section-shell">
+          <SectionIntro
+            eyebrow="Testimonials Slider"
+            title="Social proof that feels like a planner group chat"
+            body="These sample testimonials show how the product story lands: fewer disasters, faster backups, and calmer clients."
+          />
+          <div className="mt-10">
+            <TestimonialsSlider items={testimonials} />
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      <footer className="section-shell mt-18 sm:mt-24">
+        <div className="glass-panel overflow-hidden px-6 py-8 sm:px-8">
+          <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr_1fr]">
+            <div>
+              <Badge className="rounded-full bg-primary/10 px-3 py-1 text-primary shadow-none">
+                Event insurance, reimagined
+              </Badge>
+              <h2 className="mt-5 font-heading text-4xl leading-none sm:text-5xl">
+                Backup vendors before panic goes viral.
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
+                Wedding Shadow Book helps planners cover talent, decor, transport, and beauty no-shows with AI matching and escrow-safe approvals.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button asChild className="rounded-full px-5">
+                  <a href={siteConfig.stripeSignupUrl}>Start Free Trial</a>
+                </Button>
+                <Button asChild variant="outline" className="rounded-full px-5">
+                  <a href="#features">Explore features</a>
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                Product
+              </div>
+              <div className="mt-4 space-y-3 text-sm">
+                {faqLinks.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    className="flex items-center gap-2 text-foreground/85 transition hover:text-primary"
+                  >
+                    <CoinsIcon className="size-4 text-primary" />
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                Trust
+              </div>
+              <div className="mt-4 space-y-4 text-sm text-foreground/85">
+                <div className="flex items-start gap-3">
+                  <AlertTriangleIcon className="mt-0.5 size-4 text-primary" />
+                  <span>Privacy-first event data handling and opt-in vendor outreach.</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <ShieldCheckIcon className="mt-0.5 size-4 text-primary" />
+                  <span>Escrow release controls keep replacement payments accountable.</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <UsersRoundIcon className="mt-0.5 size-4 text-primary" />
+                  <span>Built for planners, venues, and associate coordinators on event day.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-border/70 pt-5 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p>© 2026 Wedding Shadow Book. All rights reserved.</p>
+              <div className="flex flex-wrap gap-4">
+                <a href="#privacy" className="transition hover:text-foreground">
+                  Privacy
+                </a>
+                <a href="#terms" className="transition hover:text-foreground">
+                  Terms
+                </a>
+                <a href="mailto:founders@weddingshadowbook.com" className="transition hover:text-foreground">
+                  Contact
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );

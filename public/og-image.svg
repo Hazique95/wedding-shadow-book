@@ -1,0 +1,31 @@
+﻿<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="42" fill="#FFF7F6"/>
+  <rect x="38" y="38" width="1124" height="554" rx="34" fill="url(#bg)"/>
+  <circle cx="980" cy="134" r="124" fill="#F9D58A" fill-opacity="0.7"/>
+  <circle cx="210" cy="122" r="144" fill="#F4A8BE" fill-opacity="0.6"/>
+  <rect x="92" y="96" width="216" height="46" rx="23" fill="white" fill-opacity="0.9"/>
+  <path d="M134 119H152" stroke="#E25A86" stroke-width="10" stroke-linecap="round"/>
+  <text x="170" y="126" fill="#7D3D55" font-family="Arial, sans-serif" font-size="22" font-weight="700">Wedding Shadow Book</text>
+  <text x="92" y="252" fill="#241821" font-family="Georgia, serif" font-size="74" font-weight="700">End Wedding Vendor</text>
+  <text x="92" y="334" fill="#241821" font-family="Georgia, serif" font-size="74" font-weight="700">No-Shows Forever</text>
+  <text x="92" y="404" fill="#7A5C66" font-family="Arial, sans-serif" font-size="30">AI backups in 1-click - your event insurance</text>
+  <rect x="92" y="454" width="264" height="64" rx="32" fill="url(#cta)"/>
+  <text x="138" y="495" fill="white" font-family="Arial, sans-serif" font-size="26" font-weight="700">Start Free Trial</text>
+  <rect x="728" y="166" width="336" height="286" rx="28" fill="white" fill-opacity="0.92"/>
+  <rect x="760" y="214" width="150" height="18" rx="9" fill="#241821"/>
+  <rect x="760" y="256" width="112" height="14" rx="7" fill="#AF808D"/>
+  <rect x="760" y="320" width="82" height="90" rx="18" fill="#F7C86F"/>
+  <rect x="858" y="286" width="82" height="124" rx="18" fill="#F08AA6"/>
+  <rect x="956" y="246" width="82" height="164" rx="18" fill="#DB618A"/>
+  <defs>
+    <linearGradient id="bg" x1="38" y1="38" x2="1162" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF9F6"/>
+      <stop offset="0.5" stop-color="#FFE8ED"/>
+      <stop offset="1" stop-color="#FFF0D6"/>
+    </linearGradient>
+    <linearGradient id="cta" x1="92" y1="454" x2="356" y2="518" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E65B87"/>
+      <stop offset="1" stop-color="#F5C86A"/>
+    </linearGradient>
+  </defs>
+</svg>
