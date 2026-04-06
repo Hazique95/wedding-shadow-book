@@ -1,3 +1,4 @@
+import type { CurrencyCode } from "@/lib/auth-types";
 import { VENDOR_SERVICES, type VendorService } from "@/lib/vendor/types";
 
 export const EVENT_SERVICES = VENDOR_SERVICES;
@@ -33,6 +34,7 @@ export type VendorMatchRecord = {
   verified: boolean;
   distance_meters: number;
   risk_score: number;
+  vendor_currency: CurrencyCode;
 };
 
 export type MatchEventsResponse = {
@@ -42,7 +44,7 @@ export type MatchEventsResponse = {
 };
 
 export type BookingType = "primary" | "shadow";
-export type BookingStatus = "pending" | "confirmed";
+export type BookingStatus = "pending" | "paid" | "confirmed" | "payment_failed";
 
 export type CreateBookingPayload = {
   eventId: string;
@@ -55,4 +57,7 @@ export type BookingResponse = {
   id: string;
   status: BookingStatus;
   escrow_amount: number;
+  currency: CurrencyCode;
+  checkout_url?: string;
+  session_id?: string;
 };

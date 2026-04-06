@@ -60,7 +60,7 @@ export default async function DashboardEventsPage() {
         </Card>
       ) : (
         <div className="mt-8">
-          <EventsDashboard />
+          <EventsDashboard preferredCurrency={profile.currency} />
         </div>
       )}
     </main>

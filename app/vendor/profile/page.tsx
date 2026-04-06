@@ -1,4 +1,4 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { VendorProfileForm } from "@/components/vendor/vendor-profile-form";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,7 @@ export default async function VendorProfilePage() {
             fallbackService={(profile.service as VendorService | null) ?? null}
             fallbackRate={profile.hourly_rate}
             fallbackBio={profile.bio}
+            preferredCurrency={profile.currency}
             gigs={gigs}
           />
         </div>

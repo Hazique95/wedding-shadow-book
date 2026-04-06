@@ -12,8 +12,9 @@ import {
   UsersIcon,
 } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
+import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { GooglePlacesInput } from "@/components/auth/google-places-input";
@@ -23,6 +24,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { CurrencyCode } from "@/lib/auth-types";
+import { convertCurrencyAmount, formatMoney } from "@/lib/currency";
 import {
   DEFAULT_EVENT_BUDGET,
   DEFAULT_EVENT_HOURS,
@@ -36,7 +39,6 @@ import {
 } from "@/lib/events/types";
 import {
   calculateEscrowAmount,
-  formatCurrency,
   formatDistance,
   getAdvancedRiskTone,
   getRiskScoreTone,
@@ -45,6 +47,10 @@ import {
 import type { VendorRiskAnalysisResponse } from "@/lib/risk/types";
 import { cn } from "@/lib/utils";
 
+type EventsDashboardProps = {
+  preferredCurrency: CurrencyCode;
+};
+
 type BookingIntent = {
   vendor: VendorMatchRecord;
   type: BookingType;
@@ -52,7 +58,9 @@ type BookingIntent = {
 
 const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@weddingshadowbook.com";
 
-export function EventsDashboard() {
+export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
+  const searchParams = useSearchParams();
+  const checkoutToastShown = useRef(false);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [venueLabel, setVenueLabel] = useState("");
   const [venueLat, setVenueLat] = useState<number | null>(null);
@@ -74,13 +82,26 @@ export function EventsDashboard() {
 
   const [startDate, endDate] = dateRange;
 
+  useEffect(() => {
+    if (searchParams.get("checkout") === "cancelled" && !checkoutToastShown.current) {
+      checkoutToastShown.current = true;
+      toast.error("Checkout was not completed. You can retry the payment.");
+    }
+  }, [searchParams]);
+
   const bookingPreview = useMemo(() => {
     if (!bookingIntent) {
       return null;
     }
 
-    return calculateEscrowAmount(bookingIntent.vendor.hourly_rate, estimatedHours);
-  }, [bookingIntent, estimatedHours]);
+    const displayedRate = convertCurrencyAmount(
+      bookingIntent.vendor.hourly_rate,
+      bookingIntent.vendor.vendor_currency,
+      preferredCurrency
+    );
+
+    return calculateEscrowAmount(displayedRate, estimatedHours);
+  }, [bookingIntent, estimatedHours, preferredCurrency]);
 
   const bookingRiskInsight = bookingIntent ? riskInsights[bookingIntent.vendor.id] : null;
   const bookingRiskLoading = bookingIntent ? Boolean(loadingRiskIds[bookingIntent.vendor.id]) : false;
@@ -228,22 +249,24 @@ export function EventsDashboard() {
         }),
       });
 
-      const payload = (await response.json()) as { error?: string; escrow_amount?: number };
+      const payload = (await response.json()) as { error?: string; checkout_url?: string; currency?: CurrencyCode; escrow_amount?: number };
 
       if (!response.ok) {
         throw new Error(payload.error ?? "Booking failed.");
       }
 
+      if (!payload.checkout_url) {
+        throw new Error("Stripe checkout link was not created.");
+      }
+
       toast.success(
-        `${bookingIntent.type === "primary" ? "Primary vendor" : "Shadow vendor"} booking created for ${formatCurrency(
-          payload.escrow_amount ?? bookingPreview ?? 0
-        )} escrow.`
+        `Escrow session ready for ${formatMoney(payload.escrow_amount ?? bookingPreview ?? 0, payload.currency ?? preferredCurrency)}.`
       );
-      setBookingIntent(null);
+      window.location.assign(payload.checkout_url);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Booking failed.");
-    } finally {
       setIsBooking(false);
+      return;
     }
   }
 
@@ -258,7 +281,7 @@ export function EventsDashboard() {
               </Badge>
               <h2 className="mt-4 font-heading text-4xl leading-none sm:text-5xl">Create a wedding event</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Search across nearby vendors within 50km, check availability overlap, and book a primary plus shadow backup with escrow-safe pricing.
+                Search across nearby vendors within 50km, check availability overlap, and launch Stripe-hosted escrow checkout for primary and shadow coverage.
               </p>
             </div>
             <div className="hidden rounded-[1.75rem] border border-primary/15 bg-primary/8 p-4 text-right sm:block">
@@ -297,12 +320,10 @@ export function EventsDashboard() {
                     setVenueLng(lng);
                   }}
                 />
-              </div>
-
-              <div className="space-y-3">
+              </div>              <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor="event-budget">Budget</Label>
-                  <span className="text-sm font-medium text-foreground/85">{formatCurrency(budget)}</span>
+                  <span className="text-sm font-medium text-foreground/85">{formatMoney(budget, preferredCurrency)}</span>
                 </div>
                 <input
                   id="event-budget"
@@ -315,8 +336,8 @@ export function EventsDashboard() {
                   className="h-2 w-full cursor-pointer accent-primary"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{formatCurrency(MIN_EVENT_BUDGET)}</span>
-                  <span>{formatCurrency(MAX_EVENT_BUDGET)}</span>
+                  <span>{formatMoney(MIN_EVENT_BUDGET, preferredCurrency)}</span>
+                  <span>{formatMoney(MAX_EVENT_BUDGET, preferredCurrency)}</span>
                 </div>
               </div>
 
@@ -422,6 +443,7 @@ export function EventsDashboard() {
                     const riskInsight = riskInsights[vendor.id];
                     const isRiskLoading = Boolean(loadingRiskIds[vendor.id]);
                     const advancedScore = riskInsight?.finalScore ?? vendor.risk_score * 2;
+                    const displayedRate = convertCurrencyAmount(vendor.hourly_rate, vendor.vendor_currency, preferredCurrency);
                     const riskSourceLabel = isRiskLoading
                       ? "AI review running"
                       : riskInsight
@@ -486,7 +508,10 @@ export function EventsDashboard() {
                             <div className="grid gap-3 text-sm sm:grid-cols-3">
                               <div className="rounded-2xl border border-border bg-background/80 p-3 dark:bg-white/6">
                                 <div className="text-muted-foreground">Hourly rate</div>
-                                <div className="mt-1 font-semibold">{formatCurrency(vendor.hourly_rate)}</div>
+                                <div className="mt-1 font-semibold">{formatMoney(displayedRate, preferredCurrency)}</div>
+                                {vendor.vendor_currency !== preferredCurrency ? (
+                                  <div className="mt-1 text-xs text-muted-foreground">Converted from {vendor.vendor_currency}</div>
+                                ) : null}
                               </div>
                               <div className="rounded-2xl border border-border bg-background/80 p-3 dark:bg-white/6">
                                 <div className="text-muted-foreground">Star rating</div>
@@ -503,9 +528,7 @@ export function EventsDashboard() {
                                     : "New vendor"}
                                 </div>
                               </div>
-                            </div>
-
-                            <div className="rounded-[1.5rem] border border-border bg-background/80 p-4 dark:bg-white/6">
+                            </div>                            <div className="rounded-[1.5rem] border border-border bg-background/80 p-4 dark:bg-white/6">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                   <div className="text-sm font-medium">Advanced reliability scan</div>
@@ -621,7 +644,7 @@ export function EventsDashboard() {
                 {bookingIntent?.type === "primary" ? "Confirm primary booking" : "Confirm shadow booking"}
               </DialogTitle>
               <DialogDescription>
-                Lock {bookingIntent?.vendor.name} with an escrow premium of 10% above the hourly rate.
+                Launch a Stripe-hosted escrow payment with a 10% platform fee already split from the vendor payout.
               </DialogDescription>
             </DialogHeader>
 
@@ -631,7 +654,16 @@ export function EventsDashboard() {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-medium">{bookingIntent.vendor.name}</div>
-                      <div className="mt-1 text-sm text-muted-foreground">{formatCurrency(bookingIntent.vendor.hourly_rate)} per hour</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {formatMoney(
+                          convertCurrencyAmount(
+                            bookingIntent.vendor.hourly_rate,
+                            bookingIntent.vendor.vendor_currency,
+                            preferredCurrency
+                          ),
+                          preferredCurrency
+                        )} per hour
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <Badge className={cn("rounded-full px-3 py-1 shadow-none", getRiskScoreTone(bookingIntent.vendor.risk_score))}>
@@ -646,7 +678,6 @@ export function EventsDashboard() {
                     <p className="mt-3 text-sm leading-6 text-muted-foreground">{bookingRiskInsight.explanation}</p>
                   ) : null}
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="estimated-hours">Estimated hours</Label>
                   <Input
@@ -663,12 +694,12 @@ export function EventsDashboard() {
                   <div className="rounded-[1.5rem] border border-border bg-background/70 p-4 dark:bg-white/4">
                     <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Base spend</div>
                     <div className="mt-2 text-xl font-semibold">
-                      {formatCurrency(bookingIntent.vendor.hourly_rate * estimatedHours)}
+                      {formatMoney((bookingPreview ?? 0) / 1.1, preferredCurrency)}
                     </div>
                   </div>
                   <div className="rounded-[1.5rem] border border-primary/20 bg-primary/8 p-4 dark:border-primary/15 dark:bg-primary/10">
                     <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Escrow total</div>
-                    <div className="mt-2 text-xl font-semibold">{formatCurrency(bookingPreview ?? 0)}</div>
+                    <div className="mt-2 text-xl font-semibold">{formatMoney(bookingPreview ?? 0, preferredCurrency)}</div>
                   </div>
                 </div>
               </div>
@@ -678,7 +709,7 @@ export function EventsDashboard() {
           <DialogFooter className="rounded-b-[1.75rem] bg-muted/40 dark:bg-white/4" showCloseButton>
             <Button onClick={handleBookingConfirm} className="rounded-full" disabled={isBooking || !bookingIntent}>
               {isBooking ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
-              {isBooking ? "Creating booking..." : "Confirm booking"}
+              {isBooking ? "Opening checkout..." : "Continue to payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

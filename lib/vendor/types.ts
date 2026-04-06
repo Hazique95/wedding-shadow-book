@@ -1,4 +1,4 @@
-﻿export const VENDOR_SERVICES = [
+export const VENDOR_SERVICES = [
   "mehndi",
   "catering",
   "dj",
@@ -33,6 +33,12 @@ export type VendorProfileRecord = {
   hourly_rate: number;
   verified: boolean;
   claimed_at: string | null;
+  stripe_account_id: string | null;
+  stripe_account_country: "US" | "PK" | null;
+  stripe_onboarding_complete: boolean;
+  stripe_charges_enabled: boolean;
+  stripe_payouts_enabled: boolean;
+  stripe_details_submitted: boolean;
 };
 
 export type VendorGigRecord = {

@@ -16,14 +16,6 @@ export function calculateEscrowAmount(hourlyRate: number, estimatedHours = DEFAU
   return Number((hourlyRate * estimatedHours * 1.1).toFixed(2));
 }
 
-export function formatCurrency(amount: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: amount >= 1000 ? 0 : 2,
-  }).format(amount);
-}
-
 export function formatDistance(distanceMeters: number) {
   return `${(distanceMeters / 1000).toFixed(1)} km away`;
 }
@@ -61,6 +53,7 @@ export function normalizeVendorMatch(raw: {
   verified: boolean;
   distance_meters: number | string;
   risk_score: number | string;
+  vendor_currency?: string | null;
 }): VendorMatchRecord {
   const services = Array.isArray(raw.services)
     ? raw.services.filter((value): value is VendorService => typeof value === "string")
@@ -80,6 +73,7 @@ export function normalizeVendorMatch(raw: {
     verified: raw.verified,
     distance_meters: Number(raw.distance_meters),
     risk_score: Number(raw.risk_score),
+    vendor_currency: raw.vendor_currency === "PKR" ? "PKR" : "USD",
   };
 }
 

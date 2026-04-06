@@ -6,6 +6,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 
 import { GooglePlacesInput } from "@/components/auth/google-places-input";
+import { StripeConnectCard } from "@/components/vendor/stripe-connect-card";
 import { AvailabilityCalendar } from "@/components/vendor/availability-calendar";
 import { GigHistoryTable } from "@/components/vendor/gig-history-table";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { CurrencyCode } from "@/lib/auth-types";
+import { formatMoney } from "@/lib/currency";
 import { buildAvailabilityIcs } from "@/lib/vendor/ics";
 import { VENDOR_SERVICES, type VendorFormValues, type VendorGigRecord, type VendorProfileRecord, type VendorService } from "@/lib/vendor/types";
 import { uploadVendorImage } from "@/lib/vendor/upload";
@@ -27,6 +30,7 @@ type VendorProfileFormProps = {
   fallbackService: VendorService | null;
   fallbackRate: number | null;
   fallbackBio: string | null;
+  preferredCurrency: CurrencyCode;
   gigs: VendorGigRecord[];
 };
 
@@ -39,7 +43,7 @@ function initialValuesFromProps({
   fallbackService,
   fallbackRate,
   fallbackBio,
-}: Omit<VendorProfileFormProps, "gigs" | "userId">): VendorFormValues {
+}: Omit<VendorProfileFormProps, "gigs" | "userId" | "preferredCurrency">): VendorFormValues {
   return {
     id: initialVendor?.id,
     name: initialVendor?.name ?? fallbackName,
@@ -172,7 +176,7 @@ export function VendorProfileForm(props: VendorProfileFormProps) {
               />
 
               <div className="space-y-2">
-                <Label htmlFor="vendor-rate">Hourly rate</Label>
+                <Label htmlFor="vendor-rate">Hourly rate ({props.preferredCurrency})</Label>
                 <Input
                   id="vendor-rate"
                   type="number"
@@ -186,9 +190,9 @@ export function VendorProfileForm(props: VendorProfileFormProps) {
                       hourlyRate: event.target.value ? Number(event.target.value) : null,
                     }))
                   }
-                  placeholder="2500"
+                  placeholder={props.preferredCurrency === "PKR" ? "15000" : "125"}
                 />
-                <p className="text-xs text-muted-foreground">Allowed range: 100 to 5000.</p>
+                <p className="text-xs text-muted-foreground">Stored and displayed in your selected currency preference.</p>
               </div>
             </div>
 
@@ -254,6 +258,14 @@ export function VendorProfileForm(props: VendorProfileFormProps) {
           </div>
 
           <div className="space-y-6">
+            <StripeConnectCard
+              accountId={props.initialVendor?.stripe_account_id ?? null}
+              country={props.initialVendor?.stripe_account_country ?? null}
+              onboardingComplete={props.initialVendor?.stripe_onboarding_complete ?? false}
+              payoutsEnabled={props.initialVendor?.stripe_payouts_enabled ?? false}
+              preferredCurrency={props.preferredCurrency}
+            />
+
             <div className="rounded-[1.75rem] border border-border bg-background/70 p-5 dark:bg-white/5">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -330,6 +342,7 @@ export function VendorProfileForm(props: VendorProfileFormProps) {
                 <div>Lat: {values.locationLat ?? "-"}</div>
                 <div>Lng: {values.locationLng ?? "-"}</div>
                 <div>Services: {values.services.length || 0} selected</div>
+                <div>Rate: {values.hourlyRate ? formatMoney(values.hourlyRate, props.preferredCurrency) : "Not set"}</div>
               </div>
             </div>
 
