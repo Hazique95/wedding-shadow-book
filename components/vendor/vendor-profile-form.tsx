@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { CalendarArrowUpIcon, CheckCircle2Icon, LoaderCircleIcon, MapPinIcon, ShieldAlertIcon, UploadIcon } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 
 import { GooglePlacesInput } from "@/components/auth/google-places-input";
@@ -13,9 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createClient } from "@/lib/supabase/client";
 import { buildAvailabilityIcs } from "@/lib/vendor/ics";
-import { submitVendorProfile } from "@/lib/vendor/submit-vendor-profile";
 import { VENDOR_SERVICES, type VendorFormValues, type VendorGigRecord, type VendorProfileRecord, type VendorService } from "@/lib/vendor/types";
 import { uploadVendorImage } from "@/lib/vendor/upload";
 
@@ -68,7 +66,6 @@ export function VendorProfileForm(props: VendorProfileFormProps) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(props.initialVendor?.primary_image_url ?? null);
   const [isSaving, setIsSaving] = useState(false);
-  const supabase = useMemo(() => createClient(), []);
 
   function toggleService(service: VendorService) {
     setValues((current) => ({
@@ -103,23 +100,44 @@ export function VendorProfileForm(props: VendorProfileFormProps) {
     setIsSaving(true);
 
     try {
-      const payload = await submitVendorProfile(
-        values,
-        {
-          supabase,
-          userId: props.userId,
-          uploadImage: uploadVendorImage,
+      let primaryImageUrl = values.primaryImageUrl;
+      let portfolioUrl = values.portfolioUrl;
+
+      if (imageFile) {
+        primaryImageUrl = await uploadVendorImage(imageFile, props.userId);
+        portfolioUrl = Array.from(new Set([primaryImageUrl, ...portfolioUrl]));
+      }
+
+      const response = await fetch("/api/vendor/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        imageFile
-      );
+        body: JSON.stringify({
+          ...values,
+          primaryImageUrl,
+          portfolioUrl,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        id?: string;
+        primary_image_url?: string | null;
+        portfolio_url?: string[];
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to save vendor profile.");
+      }
 
       setValues((current) => ({
         ...current,
-        id: payload.id,
-        primaryImageUrl: payload.primary_image_url,
-        portfolioUrl: payload.portfolio_url,
+        id: payload.id ?? current.id,
+        primaryImageUrl: payload.primary_image_url ?? primaryImageUrl,
+        portfolioUrl: payload.portfolio_url ?? portfolioUrl,
       }));
-      setPreviewUrl(payload.primary_image_url);
+      setPreviewUrl(payload.primary_image_url ?? primaryImageUrl);
       setImageFile(null);
       toast.success("Vendor profile saved.");
     } catch (error) {

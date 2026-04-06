@@ -1,0 +1,70 @@
+[
+  {
+    "country": "Pakistan",
+    "cities": [
+      { "name": "Lahore", "postalCodes": ["54000", "54010", "54810"] },
+      { "name": "Karachi", "postalCodes": ["74000", "74200", "75500"] },
+      { "name": "Islamabad", "postalCodes": ["44000", "44010", "44220"] },
+      { "name": "Rawalpindi", "postalCodes": ["46000", "46300", "46600"] },
+      { "name": "Faisalabad", "postalCodes": ["38000", "38090", "38850"] }
+    ]
+  },
+  {
+    "country": "United Arab Emirates",
+    "cities": [
+      { "name": "Dubai", "postalCodes": ["00000", "11111", "22222"] },
+      { "name": "Abu Dhabi", "postalCodes": ["30000", "30010", "30020"] },
+      { "name": "Sharjah", "postalCodes": ["50000", "50010", "50020"] },
+      { "name": "Ajman", "postalCodes": ["70000", "70010", "70020"] }
+    ]
+  },
+  {
+    "country": "Saudi Arabia",
+    "cities": [
+      { "name": "Riyadh", "postalCodes": ["11461", "11564", "12211"] },
+      { "name": "Jeddah", "postalCodes": ["21411", "21442", "21577"] },
+      { "name": "Dammam", "postalCodes": ["31146", "31411", "32241"] }
+    ]
+  },
+  {
+    "country": "United Kingdom",
+    "cities": [
+      { "name": "London", "postalCodes": ["EC1A 1BB", "SW1A 1AA", "N1 9GU"] },
+      { "name": "Manchester", "postalCodes": ["M1 1AE", "M2 5DB", "M3 4LZ"] },
+      { "name": "Birmingham", "postalCodes": ["B1 1TB", "B2 4QA", "B3 2HB"] }
+    ]
+  },
+  {
+    "country": "United States",
+    "cities": [
+      { "name": "New York", "postalCodes": ["10001", "10018", "11201"] },
+      { "name": "Los Angeles", "postalCodes": ["90001", "90012", "90210"] },
+      { "name": "Chicago", "postalCodes": ["60601", "60611", "60614"] }
+    ]
+  },
+  {
+    "country": "Canada",
+    "cities": [
+      { "name": "Toronto", "postalCodes": ["M5H 2N2", "M4B 1B3", "M6G 1A1"] },
+      { "name": "Vancouver", "postalCodes": ["V5K 0A1", "V6B 1A1", "V6E 2Y3"] },
+      { "name": "Calgary", "postalCodes": ["T2P 1J9", "T2N 1N4", "T3A 0E4"] }
+    ]
+  },
+  {
+    "country": "India",
+    "cities": [
+      { "name": "Mumbai", "postalCodes": ["400001", "400050", "400099"] },
+      { "name": "Delhi", "postalCodes": ["110001", "110017", "110070"] },
+      { "name": "Bengaluru", "postalCodes": ["560001", "560034", "560066"] },
+      { "name": "Hyderabad", "postalCodes": ["500001", "500032", "500081"] }
+    ]
+  },
+  {
+    "country": "Australia",
+    "cities": [
+      { "name": "Sydney", "postalCodes": ["2000", "2010", "2026"] },
+      { "name": "Melbourne", "postalCodes": ["3000", "3006", "3121"] },
+      { "name": "Brisbane", "postalCodes": ["4000", "4006", "4101"] }
+    ]
+  }
+]

@@ -1,4 +1,3 @@
-﻿import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -14,7 +13,9 @@ import {
   WalletCardsIcon,
 } from "lucide-react";
 
-import { HeroExperiment } from "@/components/hero-experiment";
+import { DeferredPainPointsCarousel } from "@/components/deferred-pain-points-carousel";
+import { DeferredTestimonialsSlider } from "@/components/deferred-testimonials-slider";
+import { HeroExperiment, resolveHeroVariant } from "@/components/hero-experiment";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,9 +29,6 @@ import {
   stats,
   testimonials,
 } from "@/lib/site-content";
-
-const PainPointsCarousel = dynamic(() => import("@/components/pain-points-carousel"));
-const TestimonialsSlider = dynamic(() => import("@/components/testimonials-slider"));
 
 const featureIcons = [BrainCircuitIcon, UsersRoundIcon, WalletCardsIcon];
 
@@ -57,7 +55,83 @@ function SectionIntro({
   );
 }
 
-export default function Home() {
+function PainPointsFallback() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+      <Card className="border-white/45 bg-white/76 dark:border-white/10 dark:bg-white/6">
+        <CardContent className="p-6">
+          <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Flake horror stories</div>
+          <h3 className="mt-2 font-heading text-3xl leading-none">One no-show becomes six fires</h3>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">
+            Interactive carousel loads after first paint so the landing route can stay lighter.
+          </p>
+        </CardContent>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-3">
+        {painPoints.map((item, index) => (
+          <Card
+            key={item.title}
+            className={`min-h-full border-white/45 bg-white/76 dark:border-white/10 dark:bg-white/6 ${
+              index === 0 ? "shadow-[0_36px_90px_-56px_rgba(150,75,95,0.75)] ring-1 ring-primary/30" : "opacity-80"
+            }`}
+          >
+            <CardContent className="flex h-full flex-col p-6">
+              <div className="text-xs uppercase tracking-[0.24em] text-primary">{item.label}</div>
+              <h4 className="mt-3 font-heading text-3xl leading-none">{item.title}</h4>
+              <p className="mt-4 flex-1 text-sm leading-7 text-muted-foreground">{item.story}</p>
+              <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/6 p-4 text-sm leading-6 dark:bg-white/6">
+                {item.impact}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TestimonialsFallback() {
+  return (
+    <Card className="overflow-hidden border-white/45 bg-white/78 dark:border-white/10 dark:bg-white/6">
+      <CardContent className="p-6 sm:p-8">
+        <div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-primary">
+            Testimonials
+          </div>
+          <h3 className="mt-3 font-heading text-4xl leading-none">Sample praise with real buying language</h3>
+        </div>
+        <div className="mt-7 grid gap-4 lg:grid-cols-3">
+          {testimonials.map((item, index) => (
+            <Card
+              key={item.name}
+              className={`border-white/45 bg-white/85 dark:border-white/10 dark:bg-white/8 ${
+                index === 0 ? "shadow-[0_32px_90px_-56px_rgba(150,75,95,0.75)] ring-1 ring-primary/30" : "lg:translate-y-3"
+              }`}
+            >
+              <CardContent className="flex h-full flex-col p-5">
+                <div>
+                  <div className="font-medium">{item.name}</div>
+                  <div className="text-sm text-muted-foreground">{item.role}</div>
+                </div>
+                <p className="mt-5 flex-1 text-sm leading-7 text-foreground/85">&ldquo;{item.quote}&rdquo;</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type HomeProps = {
+  searchParams: Promise<{ ab?: string | string[] }>;
+};
+
+export default async function Home({ searchParams }: HomeProps) {
+  const params = await searchParams;
+  const rawVariant = Array.isArray(params.ab) ? params.ab[0] : params.ab;
+  const heroVariant = resolveHeroVariant(rawVariant);
+
   return (
     <div className="pb-16 sm:pb-24">
       <header className="section-shell pt-4 sm:pt-6">
@@ -104,6 +178,7 @@ export default function Home() {
         <HeroExperiment
           demoVideoUrl={siteConfig.demoVideoUrl}
           stripeSignupUrl={siteConfig.stripeSignupUrl}
+          variant={heroVariant}
         />
 
         <section className="section-shell">
@@ -136,7 +211,7 @@ export default function Home() {
             body="Wedding Shadow Book turns those 11pm panic texts into a single workflow: detect risk, match backups, and lock in a replacement before the aisle walk starts slipping."
           />
           <div className="mt-10">
-            <PainPointsCarousel items={painPoints} />
+            <DeferredPainPointsCarousel items={painPoints} fallback={<PainPointsFallback />} />
           </div>
         </section>
 
@@ -301,7 +376,7 @@ export default function Home() {
             body="These sample testimonials show how the product story lands: fewer disasters, faster backups, and calmer clients."
           />
           <div className="mt-10">
-            <TestimonialsSlider items={testimonials} />
+            <DeferredTestimonialsSlider items={testimonials} fallback={<TestimonialsFallback />} />
           </div>
         </section>
       </main>

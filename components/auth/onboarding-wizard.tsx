@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import { CheckCircle2Icon, ChevronRightIcon, LoaderCircleIcon, SparklesIcon } from "lucide-react";
@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
-import { GooglePlacesInput } from "@/components/auth/google-places-input";
+import { LocationCatalogInput } from "@/components/auth/location-catalog-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,30 +24,32 @@ import {
   type UserRole,
 } from "@/lib/auth-types";
 import { normalizeAuthError } from "@/lib/auth-errors";
+import { buildLocationLabel, isValidLocationSelection, parseStoredLocationLabel } from "@/lib/location-data";
 import { withRetry } from "@/lib/retry";
-import { createClient } from "@/lib/supabase/client";
 import { readStoredUTM } from "@/lib/utm";
 
 const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 type OnboardingWizardProps = {
-  userId: string;
   email: string | null;
   initialProfile?: Partial<UserProfile> | null;
 };
 
 export function OnboardingWizard({
-  userId,
   email,
   initialProfile,
 }: OnboardingWizardProps) {
   const router = useRouter();
+  const initialLocation = useMemo(
+    () => parseStoredLocationLabel(initialProfile?.location_label ?? ""),
+    [initialProfile?.location_label]
+  );
   const [step, setStep] = useState(initialProfile?.role ? 2 : 1);
   const [role, setRole] = useState<UserRole | null>(initialProfile?.role ?? null);
   const [fullName, setFullName] = useState(initialProfile?.full_name ?? "");
-  const [locationLabel, setLocationLabel] = useState(initialProfile?.location_label ?? "");
-  const [locationLat, setLocationLat] = useState<number | null>(initialProfile?.location_lat ?? null);
-  const [locationLng, setLocationLng] = useState<number | null>(initialProfile?.location_lng ?? null);
+  const [country, setCountry] = useState(initialLocation?.country ?? "");
+  const [city, setCity] = useState(initialLocation?.city ?? "");
+  const [postalCode, setPostalCode] = useState(initialLocation?.postalCode ?? "");
   const [service, setService] = useState<ServiceType | "">(initialProfile?.service ?? "");
   const [bio, setBio] = useState(initialProfile?.bio ?? "");
   const [hourlyRate, setHourlyRate] = useState(initialProfile?.hourly_rate?.toString() ?? "");
@@ -68,9 +70,10 @@ export function OnboardingWizard({
   }, []);
 
   const isVendor = role === "vendor";
+  const hasValidLocation = isValidLocationSelection({ country, city, postalCode });
   const profileChecklist = useMemo(
-    () => [Boolean(fullName.trim()), Boolean(locationLabel.trim()), !isVendor || Boolean(service), !isVendor || Boolean(hourlyRate)],
-    [fullName, hourlyRate, isVendor, locationLabel, service]
+    () => [Boolean(fullName.trim()), Boolean(country), Boolean(city), Boolean(postalCode.trim()), !isVendor || Boolean(service), !isVendor || Boolean(hourlyRate)],
+    [city, country, fullName, hourlyRate, isVendor, postalCode, service]
   );
 
   function handleStepAdvance() {
@@ -88,8 +91,18 @@ export function OnboardingWizard({
       return;
     }
 
-    if (!fullName.trim() || !locationLabel.trim()) {
-      toast.error("Name and location are required.");
+    if (!fullName.trim()) {
+      toast.error("Name is required.");
+      return;
+    }
+
+    if (!country || !city || !postalCode.trim()) {
+      toast.error("Country, city, and postal code are required.");
+      return;
+    }
+
+    if (!hasValidLocation) {
+      toast.error("Choose a valid country, city, and postal code combination from the list.");
       return;
     }
 
@@ -105,30 +118,37 @@ export function OnboardingWizard({
 
     setIsSaving(true);
 
-    const supabase = createClient();
-
     try {
       await withRetry(async () => {
-        const response = await supabase.from("users").upsert({
-          id: userId,
-          email,
-          role,
-          full_name: fullName.trim(),
-          location_label: locationLabel.trim(),
-          location_lat: locationLat,
-          location_lng: locationLng,
-          service: isVendor ? service : null,
-          bio: bio.trim() || null,
-          hourly_rate: isVendor ? Number(hourlyRate) : null,
-          currency,
-          signup_source_utm: readStoredUTM(),
+        const response = await fetch("/api/onboarding", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            role,
+            fullName,
+            country,
+            city,
+            postalCode,
+            locationLabel: buildLocationLabel({ country, city, postalCode }),
+            locationLat: null,
+            locationLng: null,
+            service,
+            bio,
+            hourlyRate,
+            currency,
+            signupSourceUtm: readStoredUTM(),
+          }),
         });
 
-        if (response.error) {
-          throw response.error;
+        const payload = (await response.json()) as { error?: string };
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to save onboarding profile.");
         }
 
-        return response;
+        return payload;
       });
 
       setCelebrate(true);
@@ -213,13 +233,20 @@ export function OnboardingWizard({
             </div>
           </div>
 
-          <GooglePlacesInput
-            value={locationLabel}
-            onValueChange={setLocationLabel}
-            onCoordinatesChange={({ lat, lng }) => {
-              setLocationLat(lat);
-              setLocationLng(lng);
+          <LocationCatalogInput
+            country={country}
+            city={city}
+            postalCode={postalCode}
+            onCountryChange={(value) => {
+              setCountry(value);
+              setCity("");
+              setPostalCode("");
             }}
+            onCityChange={(value) => {
+              setCity(value);
+              setPostalCode("");
+            }}
+            onPostalCodeChange={setPostalCode}
           />
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -284,10 +311,12 @@ export function OnboardingWizard({
               <SparklesIcon className="size-4 text-primary" />
               Profile checklist
             </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 "Name added",
-                "Location captured",
+                "Country selected",
+                "City selected",
+                "Postal code selected",
                 isVendor ? "Service selected" : "Service optional",
                 isVendor ? "Rate added" : "Rate optional",
               ].map((label, index) => (
@@ -303,7 +332,7 @@ export function OnboardingWizard({
             <Button variant="outline" className="h-12 rounded-full" onClick={() => setStep(1)}>
               Back
             </Button>
-            <Button className="h-12 rounded-full px-6" onClick={handleComplete} disabled={isSaving}>
+            <Button className="h-12 rounded-full px-6" onClick={handleComplete} disabled={isSaving || !hasValidLocation}>
               {isSaving ? <LoaderCircleIcon className="size-4 animate-spin" /> : <ChevronRightIcon className="size-4" />}
               {isSaving ? "Saving profile..." : "Complete onboarding"}
             </Button>

@@ -1,15 +1,10 @@
-﻿"use client";
-
-import dynamic from "next/dynamic";
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowRightIcon, BeakerIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
-import { startTransition, useMemo, useState } from "react";
 
+import { DeferredDemoDialog } from "@/components/deferred-demo-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-
-const DemoDialog = dynamic(() => import("@/components/demo-dialog"));
 
 const variants = {
   urgency: {
@@ -26,12 +21,15 @@ const variants = {
   },
 } as const;
 
+export type HeroVariant = keyof typeof variants;
+
 type HeroExperimentProps = {
   demoVideoUrl: string;
   stripeSignupUrl: string;
+  variant: HeroVariant;
 };
 
-function getSignupHref(baseUrl: string, variant: keyof typeof variants) {
+function getSignupHref(baseUrl: string, variant: HeroVariant) {
   if (baseUrl.startsWith("#")) {
     return baseUrl;
   }
@@ -39,13 +37,20 @@ function getSignupHref(baseUrl: string, variant: keyof typeof variants) {
   return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}ab=${variant}`;
 }
 
+function getVariantHref(variant: HeroVariant) {
+  return variant === "urgency" ? "/" : `/?ab=${variant}`;
+}
+
+export function resolveHeroVariant(rawVariant: string | undefined): HeroVariant {
+  return rawVariant === "reassurance" ? "reassurance" : "urgency";
+}
+
 export function HeroExperiment({
   demoVideoUrl,
   stripeSignupUrl,
+  variant,
 }: HeroExperimentProps) {
-  const [variant, setVariant] = useState<keyof typeof variants>("urgency");
-
-  const content = useMemo(() => variants[variant], [variant]);
+  const content = variants[variant];
 
   return (
     <section className="section-shell pt-8 sm:pt-10">
@@ -73,7 +78,7 @@ export function HeroExperiment({
                   <ArrowRightIcon className="size-4" />
                 </a>
               </Button>
-              <DemoDialog videoUrl={demoVideoUrl} />
+              <DeferredDemoDialog videoUrl={demoVideoUrl} />
             </div>
 
             <p className="mt-4 text-sm text-muted-foreground">{content.microcopy}</p>
@@ -116,15 +121,24 @@ export function HeroExperiment({
                     </div>
                     <div className="mt-2 font-semibold text-foreground">{content.pill}</div>
                   </div>
-                  <Switch
-                    checked={variant === "reassurance"}
-                    onCheckedChange={(checked) => {
-                      startTransition(() => {
-                        setVariant(checked ? "reassurance" : "urgency");
-                      });
-                    }}
-                    aria-label="Toggle CTA experiment variant"
-                  />
+                  <div className="inline-flex rounded-full border border-border bg-background/85 p-1 text-xs dark:bg-white/8">
+                    <Link
+                      href={getVariantHref("urgency")}
+                      className={`rounded-full px-3 py-1.5 transition ${
+                        variant === "urgency" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Urgency
+                    </Link>
+                    <Link
+                      href={getVariantHref("reassurance")}
+                      className={`rounded-full px-3 py-1.5 transition ${
+                        variant === "reassurance" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      Reassurance
+                    </Link>
+                  </div>
                 </div>
 
                 <p className="mt-4 text-sm leading-6 text-muted-foreground">

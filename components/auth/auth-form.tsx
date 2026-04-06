@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ArrowRightIcon, LoaderCircleIcon, MailIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,12 @@ type AuthFormProps = {
   nextPath?: string;
 };
 
+type EmailAuthResponse = {
+  redirectTo: string;
+  requiresEmailConfirmation?: boolean;
+  error?: string;
+};
+
 export function AuthForm({ mode, nextPath }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -31,52 +37,43 @@ export function AuthForm({ mode, nextPath }: AuthFormProps) {
     event.preventDefault();
     setIsSubmitting(true);
 
-    const supabase = createClient();
-
     try {
-      if (mode === "signup") {
-        const result = await withRetry(async () => {
-          const response = await supabase.auth.signUp({
+      const result = await withRetry(async () => {
+        const response = await fetch("/api/auth/email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mode,
             email,
             password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-              data: {
-                signup_source_utm: readStoredUTM(),
-              },
-            },
-          });
-
-          if (response.error) {
-            throw response.error;
-          }
-
-          return response;
+            nextPath: redirectPath,
+            signupSourceUtm: readStoredUTM(),
+          }),
         });
 
-        if (result.data.session) {
-          toast.success("Account created. Let’s finish onboarding.");
-          router.replace("/onboarding");
-          router.refresh();
-        } else {
+        const payload = (await response.json()) as EmailAuthResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Authentication failed.");
+        }
+
+        return payload;
+      });
+
+      if (mode === "signup") {
+        if (result.requiresEmailConfirmation) {
           toast.success("Check your email to confirm your account.");
-          router.replace("/login");
+        } else {
+          toast.success("Account created. Let’s finish onboarding.");
         }
       } else {
-        await withRetry(async () => {
-          const response = await supabase.auth.signInWithPassword({ email, password });
-
-          if (response.error) {
-            throw response.error;
-          }
-
-          return response;
-        });
-
         toast.success("Welcome back.");
-        router.replace(redirectPath);
-        router.refresh();
       }
+
+      router.replace(result.redirectTo);
+      router.refresh();
     } catch (error) {
       toast.error(normalizeAuthError(error as { message?: string }));
     } finally {

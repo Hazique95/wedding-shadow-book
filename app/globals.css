@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -159,4 +159,67 @@
   .vendor-day-picker {
     width: 100%;
   }
+}
+
+.event-datepicker-shell input {
+  width: 100%;
+  cursor: pointer;
+}
+
+.react-datepicker {
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--card) 92%, white 8%);
+  color: var(--foreground);
+  font-family: var(--font-manrope);
+  box-shadow: 0 20px 60px -30px rgba(58, 24, 36, 0.35);
+}
+
+.react-datepicker__header {
+  border-bottom-color: var(--border);
+  background: color-mix(in oklab, var(--primary) 9%, var(--card));
+}
+
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  color: var(--foreground);
+}
+
+.react-datepicker__day-name,
+.react-datepicker__day,
+.react-datepicker__time-name {
+  color: var(--foreground);
+}
+
+.react-datepicker__day:hover,
+.react-datepicker__month-text:hover,
+.react-datepicker__quarter-text:hover,
+.react-datepicker__year-text:hover {
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 16%, transparent);
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected,
+.react-datepicker__day--in-range,
+.react-datepicker__month-text--selected,
+.react-datepicker__month-text--in-range,
+.react-datepicker__quarter-text--selected,
+.react-datepicker__quarter-text--in-range,
+.react-datepicker__year-text--selected,
+.react-datepicker__year-text--in-range {
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.react-datepicker__day--in-selecting-range:not(.react-datepicker__day--in-range) {
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--primary) 18%, transparent);
+}
+
+.react-datepicker__triangle {
+  display: none;
 }

@@ -1,4 +1,4 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/auth/onboarding-wizard";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,7 @@ export default async function OnboardingPage() {
           Choose whether you are a planner or vendor, add your location, and set the profile details that power matching and visibility.
         </p>
         <div className="glass-panel mt-8 p-6 sm:p-8">
-          <OnboardingWizard userId={user.id} email={user.email ?? null} initialProfile={profile} />
+          <OnboardingWizard email={user.email ?? null} initialProfile={profile} />
         </div>
       </div>
     </main>

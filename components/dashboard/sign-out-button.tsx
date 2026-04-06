@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -6,7 +6,6 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -15,18 +14,23 @@ export function SignOutButton() {
   async function handleSignOut() {
     setIsLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signOut();
+    try {
+      const response = await fetch("/api/auth/signout", {
+        method: "POST",
+      });
+      const payload = (await response.json()) as { error?: string };
 
-    setIsLoading(false);
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to sign out.");
+      }
 
-    if (error) {
-      toast.error(error.message);
-      return;
+      router.replace("/login");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to sign out.");
+    } finally {
+      setIsLoading(false);
     }
-
-    router.replace("/login");
-    router.refresh();
   }
 
   return (

@@ -1,11 +1,12 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 
-import { HotToastProvider } from "@/components/providers/hot-toast-provider";
+import { DeferredHotToastProvider } from "@/components/providers/deferred-hot-toast-provider";
 import { UtmTracker } from "@/components/providers/utm-tracker";
 import { ThemeProvider } from "@/components/theme-provider";
 import { siteConfig } from "@/lib/site-content";
+import "react-datepicker/dist/react-datepicker.css";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -97,7 +98,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <UtmTracker />
-          <HotToastProvider />
+          <DeferredHotToastProvider />
           {children}
         </ThemeProvider>
       </body>

@@ -1,6 +1,6 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MapPinIcon, SparklesIcon, WalletCardsIcon } from "lucide-react";
+import { CalendarRangeIcon, MapPinIcon, SparklesIcon, WalletCardsIcon } from "lucide-react";
 
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,11 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          {profile?.role === "planner" ? (
+            <Button asChild className="rounded-full">
+              <Link href="/dashboard/events">Plan new event</Link>
+            </Button>
+          ) : null}
           {profile?.role === "vendor" ? (
             <Button asChild className="rounded-full">
               <Link href="/vendor/profile">Open vendor profile</Link>
@@ -76,6 +81,25 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {profile?.role === "planner" ? (
+        <Card className="mt-6 border-white/45 bg-white/78 dark:border-white/10 dark:bg-white/6">
+          <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                <CalendarRangeIcon className="size-4" />
+                Event builder ready
+              </div>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Build an event, query nearby vendors by risk score and availability overlap, and lock both primary and shadow bookings from the new planner workflow.
+              </p>
+            </div>
+            <Button asChild variant="outline" className="rounded-full">
+              <Link href="/dashboard/events">Open event search</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
     </main>
   );
 }
