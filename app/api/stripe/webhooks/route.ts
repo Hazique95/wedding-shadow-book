@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { captureServerException } from "@/lib/monitoring/sentry";
+import { processNotificationQueue } from "@/lib/notifications/queue";
+import { notifyBookingPaid, notifyPaymentFailed } from "@/lib/notifications/service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyStripeWebhookSignature } from "@/lib/stripe/server";
 
@@ -43,7 +45,9 @@ export async function POST(request: Request) {
             stripe_payment_intent_id:
               typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
             paid_at: new Date().toISOString(),
+            payout_released_at: new Date().toISOString(),
           });
+          await notifyBookingPaid(bookingId, admin);
         }
         break;
       }
@@ -56,6 +60,7 @@ export async function POST(request: Request) {
             status: "payment_failed",
             stripe_payment_status: "expired",
           });
+          await notifyPaymentFailed(bookingId, admin);
         }
         break;
       }
@@ -69,6 +74,7 @@ export async function POST(request: Request) {
             stripe_payment_status: "failed",
             stripe_payment_intent_id: paymentIntent.id,
           });
+          await notifyPaymentFailed(bookingId, admin);
         }
         break;
       }
@@ -92,6 +98,10 @@ export async function POST(request: Request) {
       default:
         break;
     }
+
+    await processNotificationQueue({ admin }).catch(() => {
+      // Webhooks should stay resilient even if queued notifications need later retry.
+    });
 
     return NextResponse.json({ received: true });
   } catch (error) {

@@ -1,6 +1,12 @@
-﻿export type UserRole = "planner" | "vendor";
+export type UserRole = "planner" | "vendor";
 export type ServiceType = "decorator" | "caterer" | "dj" | "venue" | "photog";
 export type CurrencyCode = "PKR" | "USD";
+
+export type NotificationPreferences = {
+  sms: boolean;
+  email: boolean;
+  in_app: boolean;
+};
 
 export type UTMParams = Partial<{
   utm_source: string;
@@ -14,6 +20,7 @@ export type UTMParams = Partial<{
 export type UserProfile = {
   id: string;
   email?: string | null;
+  phone_number?: string | null;
   role: UserRole;
   full_name: string;
   location_label: string;
@@ -24,6 +31,7 @@ export type UserProfile = {
   hourly_rate: number | null;
   currency: CurrencyCode;
   signup_source_utm: UTMParams | null;
+  notification_preferences?: NotificationPreferences | null;
 };
 
 export const ROLE_OPTIONS: Array<{ value: UserRole; label: string; description: string }> = [

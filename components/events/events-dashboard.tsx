@@ -10,14 +10,17 @@ import {
   SparklesIcon,
   StarIcon,
   UsersIcon,
+  WifiOffIcon,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
-import DatePicker from "react-datepicker";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import DatePicker from "react-datepicker";
 import toast from "react-hot-toast";
 
 import { GooglePlacesInput } from "@/components/auth/google-places-input";
+import { EventTimelineStepper } from "@/components/events/event-timeline-stepper";
+import { LiveUpdatesListener } from "@/components/events/live-updates-listener";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,10 +36,13 @@ import {
   EVENT_SERVICES,
   MAX_EVENT_BUDGET,
   MIN_EVENT_BUDGET,
+  type BookingCancelResponse,
   type BookingType,
   type MatchEventsResponse,
   type VendorMatchRecord,
 } from "@/lib/events/types";
+import type { PlannerEventTimeline } from "@/lib/events/timeline";
+import { deriveTimelineStep } from "@/lib/events/timeline";
 import {
   calculateEscrowAmount,
   formatDistance,
@@ -49,6 +55,8 @@ import { cn } from "@/lib/utils";
 
 type EventsDashboardProps = {
   preferredCurrency: CurrencyCode;
+  initialTimeline: PlannerEventTimeline | null;
+  userId: string;
 };
 
 type BookingIntent = {
@@ -56,11 +64,124 @@ type BookingIntent = {
   type: BookingType;
 };
 
-const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@weddingshadowbook.com";
+type OfflineBookingAction = {
+  id: string;
+  kind: "booking";
+  payload: {
+    eventId: string;
+    vendorId: string;
+    type: BookingType;
+    estimatedHours: number;
+  };
+};
 
-export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
+type OfflineCancelAction = {
+  id: string;
+  kind: "cancel";
+  payload: {
+    bookingId: string;
+    reason?: string;
+  };
+};
+
+type OfflineAction = OfflineBookingAction | OfflineCancelAction;
+
+const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@weddingshadowbook.com";
+const OFFLINE_QUEUE_STORAGE_KEY = "wsb-offline-actions";
+
+function requestBookingCheckout(payload: OfflineBookingAction["payload"]) {
+  return fetch("/api/dashboard/events/bookings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+function requestCancelBooking(payload: OfflineCancelAction["payload"]) {
+  return fetch(`/api/dashboard/events/bookings/${payload.bookingId}/cancel`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason: payload.reason }),
+  });
+}
+
+function readOfflineActions() {
+  if (typeof window === "undefined") {
+    return [] as OfflineAction[];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_QUEUE_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as OfflineAction[]) : [];
+  } catch {
+    return [] as OfflineAction[];
+  }
+}
+
+function writeOfflineActions(actions: OfflineAction[]) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(OFFLINE_QUEUE_STORAGE_KEY, JSON.stringify(actions));
+  }
+}
+
+function enqueueOfflineAction(action: OfflineAction) {
+  const current = readOfflineActions();
+  current.push(action);
+  writeOfflineActions(current);
+  return current.length;
+}
+
+function createOfflineActionId() {
+  if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+
+  return `offline-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function applyCancelledBooking(
+  timeline: PlannerEventTimeline | null,
+  bookingId: string,
+  result: BookingCancelResponse,
+  preferredCurrency: CurrencyCode
+): PlannerEventTimeline | null {
+  if (!timeline) {
+    return timeline;
+  }
+
+  const bookings = timeline.bookings.map((booking) =>
+    booking.id === bookingId
+      ? {
+          ...booking,
+          status: result.status,
+          refundAmount: result.refundAmount,
+          refundPercentage: result.refundPercentage,
+          refundStatus: result.refundStatus,
+          displayEscrowAmount: convertCurrencyAmount(booking.escrowAmount, booking.currency, preferredCurrency),
+          canceledAt: new Date().toISOString(),
+        }
+      : booking
+  );
+
+  return {
+    ...timeline,
+    bookings,
+    step: deriveTimelineStep({
+      startDate: timeline.startDate,
+      endDate: timeline.endDate,
+      bookings,
+    }),
+  };
+}
+
+export function EventsDashboard({ preferredCurrency, initialTimeline, userId }: EventsDashboardProps) {
   const searchParams = useSearchParams();
   const checkoutToastShown = useRef(false);
+  const queueSyncRunning = useRef(false);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [venueLabel, setVenueLabel] = useState("");
   const [venueLat, setVenueLat] = useState<number | null>(null);
@@ -70,7 +191,8 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
   const [radiusKm, setRadiusKm] = useState(DEFAULT_EVENT_RADIUS_KM);
   const [services, setServices] = useState<string[]>(["mehndi", "photog"]);
   const [matches, setMatches] = useState<VendorMatchRecord[]>([]);
-  const [eventId, setEventId] = useState<string | null>(null);
+  const [eventId, setEventId] = useState<string | null>(initialTimeline?.eventId ?? null);
+  const [currentTimeline, setCurrentTimeline] = useState<PlannerEventTimeline | null>(initialTimeline);
   const [isSearching, setIsSearching] = useState(false);
   const [bookingIntent, setBookingIntent] = useState<BookingIntent | null>(null);
   const [estimatedHours, setEstimatedHours] = useState(DEFAULT_EVENT_HOURS);
@@ -78,9 +200,15 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [riskInsights, setRiskInsights] = useState<Record<string, VendorRiskAnalysisResponse>>({});
   const [loadingRiskIds, setLoadingRiskIds] = useState<Record<string, boolean>>({});
+  const [pendingOfflineActions, setPendingOfflineActions] = useState(0);
+  const [cancelingBookingId, setCancelingBookingId] = useState<string | null>(null);
   const riskRequestId = useRef(0);
 
   const [startDate, endDate] = dateRange;
+
+  useEffect(() => {
+    setPendingOfflineActions(readOfflineActions().length);
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("checkout") === "cancelled" && !checkoutToastShown.current) {
@@ -88,6 +216,67 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
       toast.error("Checkout was not completed. You can retry the payment.");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    async function flushOfflineQueue() {
+      if (queueSyncRunning.current || typeof window === "undefined" || !navigator.onLine) {
+        return;
+      }
+
+      const queued = readOfflineActions();
+      if (!queued.length) {
+        setPendingOfflineActions(0);
+        return;
+      }
+
+      queueSyncRunning.current = true;
+      const remaining: OfflineAction[] = [];
+
+      for (const action of queued) {
+        try {
+          if (action.kind === "booking") {
+            const response = await requestBookingCheckout(action.payload);
+            const payload = (await response.json()) as { error?: string; checkout_url?: string };
+
+            if (!response.ok) {
+              throw new Error(payload.error ?? "Queued booking could not be synced.");
+            }
+
+            if (payload.checkout_url) {
+              toast.success("Queued booking synced. Opening Stripe checkout now.");
+              window.location.assign(payload.checkout_url);
+              return;
+            }
+          } else {
+            const response = await requestCancelBooking(action.payload);
+            const payload = (await response.json()) as BookingCancelResponse & { error?: string };
+
+            if (!response.ok) {
+              throw new Error(payload.error ?? "Queued cancel request could not be synced.");
+            }
+
+            setCurrentTimeline((current) => applyCancelledBooking(current, action.payload.bookingId, payload, preferredCurrency));
+          }
+        } catch {
+          remaining.push(action);
+        }
+      }
+
+      writeOfflineActions(remaining);
+      setPendingOfflineActions(remaining.length);
+      queueSyncRunning.current = false;
+    }
+
+    void flushOfflineQueue();
+
+    const handleOnline = () => {
+      toast.success("Back online. Syncing queued actions now.");
+      void flushOfflineQueue();
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [preferredCurrency]);
 
   const bookingPreview = useMemo(() => {
     if (!bookingIntent) {
@@ -162,7 +351,7 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
     }
   }
 
-  async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!startDate || !endDate) {
@@ -186,7 +375,6 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
     setLoadingRiskIds({});
     setIsSearching(true);
     setHasSearched(true);
-
     try {
       const response = await fetch("/api/dashboard/events/match", {
         method: "POST",
@@ -214,6 +402,17 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
 
       setEventId(payload.eventId);
       setMatches(payload.matches);
+      setCurrentTimeline({
+        eventId: payload.eventId,
+        venueLabel,
+        startDate: toDateString(startDate),
+        endDate: toDateString(endDate),
+        services,
+        guestCount,
+        searchRadiusKm: radiusKm,
+        step: "planning",
+        bookings: [],
+      });
 
       if (payload.matches.length) {
         toast.success(payload.cached ? "Vendor shortlist loaded from cache." : "Vendor shortlist ready.");
@@ -233,22 +432,29 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
       return;
     }
 
+    const bookingPayload: OfflineBookingAction["payload"] = {
+      eventId,
+      vendorId: bookingIntent.vendor.id,
+      type: bookingIntent.type,
+      estimatedHours,
+    };
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      const count = enqueueOfflineAction({
+        id: createOfflineActionId(),
+        kind: "booking",
+        payload: bookingPayload,
+      });
+      setPendingOfflineActions(count);
+      setBookingIntent(null);
+      toast.error("You are offline. The booking action has been queued and will sync when you reconnect.");
+      return;
+    }
+
     setIsBooking(true);
 
     try {
-      const response = await fetch("/api/dashboard/events/bookings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          eventId,
-          vendorId: bookingIntent.vendor.id,
-          type: bookingIntent.type,
-          estimatedHours,
-        }),
-      });
-
+      const response = await requestBookingCheckout(bookingPayload);
       const payload = (await response.json()) as { error?: string; checkout_url?: string; currency?: CurrencyCode; escrow_amount?: number };
 
       if (!response.ok) {
@@ -264,159 +470,239 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
       );
       window.location.assign(payload.checkout_url);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Booking failed.");
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const count = enqueueOfflineAction({
+          id: createOfflineActionId(),
+          kind: "booking",
+          payload: bookingPayload,
+        });
+        setPendingOfflineActions(count);
+        setBookingIntent(null);
+        toast.error("Connection dropped. The booking action has been queued for retry.");
+      } else {
+        toast.error(error instanceof Error ? error.message : "Booking failed.");
+      }
       setIsBooking(false);
       return;
     }
   }
 
+  async function handleCancelBooking(bookingId: string) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      const count = enqueueOfflineAction({
+        id: createOfflineActionId(),
+        kind: "cancel",
+        payload: {
+          bookingId,
+        },
+      });
+      setPendingOfflineActions(count);
+      toast.error("You are offline. The cancel request has been queued.");
+      return;
+    }
+
+    setCancelingBookingId(bookingId);
+
+    try {
+      const response = await requestCancelBooking({ bookingId });
+      const payload = (await response.json()) as BookingCancelResponse & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to cancel booking.");
+      }
+
+      setCurrentTimeline((current) => applyCancelledBooking(current, bookingId, payload, preferredCurrency));
+      toast.success(
+        payload.refundPercentage
+          ? `Booking cancelled. ${payload.refundPercentage}% refund is being returned.`
+          : "Booking cancelled. Refund window has passed."
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to cancel booking.");
+    } finally {
+      setCancelingBookingId(null);
+    }
+  }
+
   return (
     <div className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
-      <Card className="glass-panel border-white/50 bg-white/80 dark:border-white/10 dark:bg-white/6">
-        <CardContent className="p-6 sm:p-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <Badge className="rounded-full bg-primary/10 px-3 py-1 text-primary shadow-none">
-                Planner command center
-              </Badge>
-              <h2 className="mt-4 font-heading text-4xl leading-none sm:text-5xl">Create a wedding event</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Search across nearby vendors within 50km, check availability overlap, and launch Stripe-hosted escrow checkout for primary and shadow coverage.
-              </p>
-            </div>
-            <div className="hidden rounded-[1.75rem] border border-primary/15 bg-primary/8 p-4 text-right sm:block">
-              <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Search radius</div>
-              <div className="mt-2 font-heading text-4xl leading-none">{radiusKm}km</div>
-            </div>
-          </div>
+      <LiveUpdatesListener userId={userId} />
 
-          <form className="mt-8 space-y-6" onSubmit={handleSearch}>
-            <div className="grid gap-5 lg:grid-cols-2">
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="event-dates">Event dates</Label>
-                <div className="event-datepicker-shell relative rounded-[1.5rem] border border-border bg-background/80 px-4 py-3 shadow-sm">
-                  <CalendarRangeIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <DatePicker
-                    id="event-dates"
-                    selectsRange
-                    startDate={startDate}
-                    endDate={endDate}
-                    minDate={new Date()}
-                    onChange={(range) => setDateRange(range)}
-                    placeholderText="Choose wedding weekend or event range"
-                    className="w-full bg-transparent pl-8 text-sm outline-none"
-                    calendarClassName="event-datepicker"
-                    dayClassName={() => "event-datepicker__day"}
+      <div className="space-y-5">
+        {pendingOfflineActions ? (
+          <Card className="glass-panel border-amber-300/40 bg-amber-500/10 dark:border-amber-300/20 dark:bg-amber-400/10">
+            <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <WifiOffIcon className="mt-0.5 size-5 text-amber-700 dark:text-amber-200" />
+                <div>
+                  <div className="font-medium">Offline actions queued</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {pendingOfflineActions} action{pendingOfflineActions === 1 ? "" : "s"} will sync automatically when your connection returns.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {currentTimeline ? (
+          <EventTimelineStepper
+            timeline={currentTimeline}
+            preferredCurrency={preferredCurrency}
+            onCancelBooking={handleCancelBooking}
+            cancelingBookingId={cancelingBookingId}
+          />
+        ) : null}
+
+        <Card className="glass-panel border-white/50 bg-white/80 dark:border-white/10 dark:bg-white/6">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Badge className="rounded-full bg-primary/10 px-3 py-1 text-primary shadow-none">
+                  Planner command center
+                </Badge>
+                <h2 className="mt-4 font-heading text-4xl leading-none sm:text-5xl">Create a wedding event</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  Search across nearby vendors within 50km, check availability overlap, and launch Stripe-hosted escrow checkout for primary and shadow coverage.
+                </p>
+              </div>
+              <div className="hidden rounded-[1.75rem] border border-primary/15 bg-primary/8 p-4 text-right sm:block">
+                <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Search radius</div>
+                <div className="mt-2 font-heading text-4xl leading-none">{radiusKm}km</div>
+              </div>
+            </div>
+
+            <form className="mt-8 space-y-6" onSubmit={handleSearch}>
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="space-y-2 lg:col-span-2">
+                  <Label htmlFor="event-dates">Event dates</Label>
+                  <div className="event-datepicker-shell relative rounded-[1.5rem] border border-border bg-background/80 px-4 py-3 shadow-sm">
+                    <CalendarRangeIcon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <DatePicker
+                      id="event-dates"
+                      selectsRange
+                      startDate={startDate}
+                      endDate={endDate}
+                      minDate={new Date()}
+                      onChange={(range) => setDateRange(range)}
+                      placeholderText="Choose wedding weekend or event range"
+                      className="w-full bg-transparent pl-8 text-sm outline-none"
+                      calendarClassName="event-datepicker"
+                      dayClassName={() => "event-datepicker__day"}
+                    />
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <GooglePlacesInput
+                    value={venueLabel}
+                    onValueChange={setVenueLabel}
+                    onCoordinatesChange={({ lat, lng }) => {
+                      setVenueLat(lat);
+                      setVenueLng(lng);
+                    }}
                   />
                 </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="event-budget">Budget</Label>
+                    <span className="text-sm font-medium text-foreground/85">{formatMoney(budget, preferredCurrency)}</span>
+                  </div>
+                  <input
+                    id="event-budget"
+                    type="range"
+                    min={MIN_EVENT_BUDGET}
+                    max={MAX_EVENT_BUDGET}
+                    step={1000}
+                    value={budget}
+                    onChange={(nextEvent) => setBudget(Number(nextEvent.target.value))}
+                    className="h-2 w-full cursor-pointer accent-primary"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{formatMoney(MIN_EVENT_BUDGET, preferredCurrency)}</span>
+                    <span>{formatMoney(MAX_EVENT_BUDGET, preferredCurrency)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="guest-count">Guest count</Label>
+                  <Input
+                    id="guest-count"
+                    type="number"
+                    min="1"
+                    max="5000"
+                    value={guestCount}
+                    onChange={(nextEvent) => setGuestCount(Number(nextEvent.target.value || 0))}
+                  />
+                  <p className="text-xs text-muted-foreground">We use party size as a signal for backup urgency and vendor capacity.</p>
+                </div>
               </div>
 
-              <div className="lg:col-span-2">
-                <GooglePlacesInput
-                  value={venueLabel}
-                  onValueChange={setVenueLabel}
-                  onCoordinatesChange={({ lat, lng }) => {
-                    setVenueLat(lat);
-                    setVenueLng(lng);
-                  }}
-                />
-              </div>              <div className="space-y-3">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="event-budget">Budget</Label>
-                  <span className="text-sm font-medium text-foreground/85">{formatMoney(budget, preferredCurrency)}</span>
+                  <Label>Required services</Label>
+                  <span className="text-xs text-muted-foreground">Matches require every selected service.</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {EVENT_SERVICES.map((service) => {
+                    const active = services.includes(service);
+
+                    return (
+                      <button
+                        key={service}
+                        type="button"
+                        onClick={() => toggleService(service)}
+                        className={cn(
+                          "rounded-full border px-4 py-2 text-sm capitalize transition",
+                          active
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-border bg-background/70 hover:border-primary/25"
+                        )}
+                      >
+                        {service}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-border bg-background/60 p-4 dark:bg-white/4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">Search radius</div>
+                    <p className="mt-1 text-xs text-muted-foreground">Default is Lahore-friendly 50km. Expand only if local matches dry up.</p>
+                  </div>
+                  <div className="text-lg font-semibold">{radiusKm} km</div>
                 </div>
                 <input
-                  id="event-budget"
                   type="range"
-                  min={MIN_EVENT_BUDGET}
-                  max={MAX_EVENT_BUDGET}
-                  step={1000}
-                  value={budget}
-                  onChange={(event) => setBudget(Number(event.target.value))}
-                  className="h-2 w-full cursor-pointer accent-primary"
+                  min="25"
+                  max="100"
+                  step="5"
+                  value={radiusKm}
+                  onChange={(nextEvent) => setRadiusKm(Number(nextEvent.target.value))}
+                  className="mt-4 h-2 w-full cursor-pointer accent-primary"
                 />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{formatMoney(MIN_EVENT_BUDGET, preferredCurrency)}</span>
-                  <span>{formatMoney(MAX_EVENT_BUDGET, preferredCurrency)}</span>
-                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="guest-count">Guest count</Label>
-                <Input
-                  id="guest-count"
-                  type="number"
-                  min="1"
-                  max="5000"
-                  value={guestCount}
-                  onChange={(event) => setGuestCount(Number(event.target.value || 0))}
-                />
-                <p className="text-xs text-muted-foreground">We use party size as a signal for backup urgency and vendor capacity.</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label>Required services</Label>
-                <span className="text-xs text-muted-foreground">Matches require every selected service.</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {EVENT_SERVICES.map((service) => {
-                  const active = services.includes(service);
-
-                  return (
-                    <button
-                      key={service}
-                      type="button"
-                      onClick={() => toggleService(service)}
-                      className={cn(
-                        "rounded-full border px-4 py-2 text-sm capitalize transition",
-                        active
-                          ? "border-primary/40 bg-primary/10 text-primary"
-                          : "border-border bg-background/70 hover:border-primary/25"
-                      )}
-                    >
-                      {service}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-border bg-background/60 p-4 dark:bg-white/4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium">Search radius</div>
-                  <p className="mt-1 text-xs text-muted-foreground">Default is Lahore-friendly 50km. Expand only if local matches dry up.</p>
-                </div>
-                <div className="text-lg font-semibold">{radiusKm} km</div>
-              </div>
-              <input
-                type="range"
-                min="25"
-                max="100"
-                step="5"
-                value={radiusKm}
-                onChange={(event) => setRadiusKm(Number(event.target.value))}
-                className="mt-4 h-2 w-full cursor-pointer accent-primary"
-              />
-            </div>
-
-            <Button type="submit" className="h-12 rounded-full px-6" disabled={isSearching}>
-              {isSearching ? <LoaderCircleIcon className="size-4 animate-spin" /> : <SearchIcon className="size-4" />}
-              {isSearching ? "Finding top vendors..." : "Find top 5 vendors"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
+              <Button type="submit" className="h-12 rounded-full px-6" disabled={isSearching}>
+                {isSearching ? <LoaderCircleIcon className="size-4 animate-spin" /> : <SearchIcon className="size-4" />}
+                {isSearching ? "Finding top vendors..." : "Find top 5 vendors"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
       <div className="space-y-5">
         <Card className="glass-panel border-white/50 bg-white/80 dark:border-white/10 dark:bg-white/6">
           <CardContent className="p-6 sm:p-8">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-medium">Ranked vendor shortlist</div>
-                <p className="mt-1 text-sm text-muted-foreground">Ordered by database risk score first, then enriched with cached GPT review analysis in the background.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Ordered by database risk score first, then enriched with cached GPT review analysis in the background.
+                </p>
               </div>
               {hasSearched ? (
                 <Badge className="rounded-full bg-secondary px-3 py-1 text-secondary-foreground shadow-none">
@@ -528,11 +814,15 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
                                     : "New vendor"}
                                 </div>
                               </div>
-                            </div>                            <div className="rounded-[1.5rem] border border-border bg-background/80 p-4 dark:bg-white/6">
+                            </div>
+
+                            <div className="rounded-[1.5rem] border border-border bg-background/80 p-4 dark:bg-white/6">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                   <div className="text-sm font-medium">Advanced reliability scan</div>
-                                  <p className="mt-1 text-xs text-muted-foreground">GPT review analysis blends with your stored database score and refreshes from cache every 24 hours.</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    GPT review analysis blends with your stored database score and refreshes from cache every 24 hours.
+                                  </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {isRiskLoading ? <LoaderCircleIcon className="size-4 animate-spin text-primary" /> : null}
@@ -559,16 +849,6 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
                                   : riskInsight?.explanation ??
                                     "Written reviews have not been analyzed yet, so the shortlist is currently showing the database baseline."}
                               </p>
-
-                              {riskInsight?.topRisks.length ? (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {riskInsight.topRisks.map((risk) => (
-                                    <Badge key={risk} className="rounded-full bg-primary/10 px-3 py-1 text-primary shadow-none">
-                                      {risk}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : null}
                             </div>
 
                             <div className="flex flex-wrap gap-3">
@@ -686,16 +966,14 @@ export function EventsDashboard({ preferredCurrency }: EventsDashboardProps) {
                     min="1"
                     max="24"
                     value={estimatedHours}
-                    onChange={(event) => setEstimatedHours(Number(event.target.value || DEFAULT_EVENT_HOURS))}
+                    onChange={(nextEvent) => setEstimatedHours(Number(nextEvent.target.value || DEFAULT_EVENT_HOURS))}
                   />
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[1.5rem] border border-border bg-background/70 p-4 dark:bg-white/4">
                     <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Base spend</div>
-                    <div className="mt-2 text-xl font-semibold">
-                      {formatMoney((bookingPreview ?? 0) / 1.1, preferredCurrency)}
-                    </div>
+                    <div className="mt-2 text-xl font-semibold">{formatMoney((bookingPreview ?? 0) / 1.1, preferredCurrency)}</div>
                   </div>
                   <div className="rounded-[1.5rem] border border-primary/20 bg-primary/8 p-4 dark:border-primary/15 dark:bg-primary/10">
                     <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Escrow total</div>

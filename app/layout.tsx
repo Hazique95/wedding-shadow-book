@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 
 import { DeferredHotToastProvider } from "@/components/providers/deferred-hot-toast-provider";
+import { ServiceWorkerRegistration } from "@/components/providers/service-worker-registration";
 import { UtmTracker } from "@/components/providers/utm-tracker";
 import { ThemeProvider } from "@/components/theme-provider";
 import { siteConfig } from "@/lib/site-content";
@@ -97,6 +98,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ServiceWorkerRegistration />
           <UtmTracker />
           <DeferredHotToastProvider />
           {children}

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getCurrentAuthState, isProfileComplete } from "@/lib/auth-state";
+import { getPlannerLatestEventTimeline } from "@/lib/dashboard/queries";
 
 export default async function DashboardEventsPage() {
   const { user, profile } = await getCurrentAuthState();
@@ -18,6 +19,8 @@ export default async function DashboardEventsPage() {
   if (!isProfileComplete(profile)) {
     redirect("/onboarding");
   }
+
+  const currentTimeline = profile?.role === "planner" ? await getPlannerLatestEventTimeline({ userId: user.id, preferredCurrency: profile.currency }) : null;
 
   return (
     <main className="section-shell py-10 sm:py-16">
@@ -60,7 +63,7 @@ export default async function DashboardEventsPage() {
         </Card>
       ) : (
         <div className="mt-8">
-          <EventsDashboard preferredCurrency={profile.currency} />
+          <EventsDashboard preferredCurrency={profile.currency} initialTimeline={currentTimeline} userId={user.id} />
         </div>
       )}
     </main>

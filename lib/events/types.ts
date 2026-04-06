@@ -1,4 +1,5 @@
 import type { CurrencyCode } from "@/lib/auth-types";
+import type { PlannerEventTimeline } from "@/lib/events/timeline";
 import { VENDOR_SERVICES, type VendorService } from "@/lib/vendor/types";
 
 export const EVENT_SERVICES = VENDOR_SERVICES;
@@ -44,7 +45,7 @@ export type MatchEventsResponse = {
 };
 
 export type BookingType = "primary" | "shadow";
-export type BookingStatus = "pending" | "paid" | "confirmed" | "payment_failed";
+export type BookingStatus = "pending" | "paid" | "confirmed" | "payment_failed" | "cancelled";
 
 export type CreateBookingPayload = {
   eventId: string;
@@ -60,4 +61,17 @@ export type BookingResponse = {
   currency: CurrencyCode;
   checkout_url?: string;
   session_id?: string;
+};
+
+export type BookingCancelResponse = {
+  bookingId: string;
+  status: BookingStatus;
+  refundAmount: number;
+  refundPercentage: number;
+  refundStatus: "none" | "pending" | "succeeded" | "failed";
+};
+
+export type EventsDashboardInitialData = {
+  currentTimeline: PlannerEventTimeline | null;
+  userId: string;
 };

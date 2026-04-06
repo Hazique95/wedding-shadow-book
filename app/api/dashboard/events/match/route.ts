@@ -4,6 +4,7 @@ import { getCachedVendorMatches, setCachedVendorMatches } from "@/lib/events/cac
 import type { MatchEventsResponse } from "@/lib/events/types";
 import { buildEventMatchCacheKey, normalizeVendorMatch } from "@/lib/events/utils";
 import { EventValidationError, parseEventSearchPayload } from "@/lib/events/validation";
+import { notifyNewMatches } from "@/lib/notifications/service";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -66,6 +67,15 @@ export async function POST(request: Request) {
           await setCachedVendorMatches(cacheKey, normalized);
           return normalized;
         })();
+
+    await notifyNewMatches({
+      userId: user.id,
+      eventId: eventRow.id,
+      matchCount: matches.length,
+      venueLabel: payload.venueLabel,
+    }).catch(() => {
+      // Match notifications are additive and should not block core search.
+    });
 
     const response: MatchEventsResponse = {
       eventId: eventRow.id,
